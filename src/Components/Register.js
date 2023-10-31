@@ -23,7 +23,7 @@ const Register = () => {
     e.preventDefault();
     try {
       const response = await registerApi(username, password, role);
-      console.log(response); // Handle the response accordingly
+      console.log(response); 
     } catch (error) {
       console.error('Error occurred during registration:', error);
     }

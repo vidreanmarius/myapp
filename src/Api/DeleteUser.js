@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { USERS_URL } from '../Utils/UrlConstants'; // Replace with your actual URL
+import { USERS_URL } from '../Utils/UrlConstants'; 
 
 const deleteUser = async (userId) => {
   try {

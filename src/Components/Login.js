@@ -25,7 +25,8 @@ const Login = () => {
       if (response && response.role) {
         setUserRole(response.role);
         setLoggedIn(true);
-        localStorage.setItem('userRole', response.role); // Save the user role to local storage
+        localStorage.setItem('userRole', response.role); 
+        localStorage.setItem('userId', response.id);
         navigate(HOME_ROUTE);
       }
     } catch (error) {
