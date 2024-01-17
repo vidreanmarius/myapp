@@ -34,6 +34,107 @@ const Homepage = () => {
   const [newMaximumHourlyEnergyConsumption, setNewMaximumHourlyEnergyConsumption] = useState('');
   const [newUserId, setNewUserId] = useState('');
 
+  const userId = localStorage.getItem('userId');
+  const userRole = localStorage.getItem('userRole');
+
+const defaultRecipientId = '2a93a5c9-0f32-4c41-690e-08dbd8a95a34';
+const adminRecipientId = 'a30f1dbf-bd3d-4747-f010-08dc173c6e67';
+
+//for is typing
+const [isTyping, setIsTyping] = useState(false);
+const [typingTimeoutId, setTypingTimeoutId] = useState(null);
+
+//for last sender
+const [lastSenderId, setLastSenderId] = useState(null); 
+
+
+
+
+  const [messages, setMessages] = useState([]);
+  const [ws, setWs] = useState(null);
+  const [messageText, setMessageText] = useState('');
+  
+  useEffect(() => {
+    const newWs = new WebSocket('wss://localhost:52176/ws/chat');
+
+    newWs.onopen = () => {
+      const userId = localStorage.getItem('userId');
+      newWs.send(userId);
+    };
+
+    newWs.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.typing && data.senderId !== userId) {
+          setIsTyping(true);
+    
+          
+          if (typingTimeoutId) {
+            clearTimeout(typingTimeoutId);
+          }
+    
+        
+          const timeoutId = setTimeout(() => {
+            setIsTyping(false);
+          }, 2000); 
+    
+          setTypingTimeoutId(timeoutId);
+        } 
+        if (data.message) { 
+          setMessages(prev => [...prev, { text: data.message, sender: data.senderId === userId ? 'self' : 'other' }]);
+          setIsTyping(false);
+          if (userRole === 'admin' && data.senderId) {
+            setLastSenderId(data.senderId); 
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing message:', error);
+      }
+    };
+  
+    newWs.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+  
+    setWs(newWs);
+  
+    return () => {
+      newWs.close();
+    };
+  }, [userId, userRole]); 
+  
+  const handleTyping = () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const typingMessage = JSON.stringify({ typing: true, senderId: userId });
+      ws.send(typingMessage);
+  
+      
+      if (typingTimeoutId) {
+        clearTimeout(typingTimeoutId);
+      }
+  
+     
+      const timeoutId = setTimeout(() => {
+        setIsTyping(false);
+      }, 2000); 
+  
+      setTypingTimeoutId(timeoutId);
+    }
+  };
+
+  const sendMessage = () => {
+    const recipientId = userRole === 'admin' && lastSenderId ? lastSenderId : adminRecipientId;
+
+    if (ws && ws.readyState === WebSocket.OPEN && recipientId) {
+      const formattedMessage = JSON.stringify({ recipientId, message: messageText });
+      ws.send(formattedMessage);
+      setMessages(prev => [...prev, { text: messageText, sender: 'self' }]);
+      setMessageText('');
+      setIsTyping(false);
+    }
+  };
+  
+
   const openAddUserModal = () => {
     setShowAddUserModal(true);
   };
@@ -88,18 +189,25 @@ const Homepage = () => {
     }
   };
 
-  const userRole = localStorage.getItem('userRole');
-  const userId = localStorage.getItem('userId');
+  
 
   const deleteUser = async (userId) => {
     try {
-      const response = await axios.delete(`${GET_USERS}/${userId}`);
-      console.log('User deleted successfully:', response.data);
-      window.location.reload();
+        const token = localStorage.getItem('token'); 
+
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${token}` 
+            }
+        };
+
+        const response = await axios.delete(`${GET_USERS}/${userId}`, config);
+        console.log('User deleted successfully:', response.data);
+        window.location.reload();
     } catch (error) {
-      console.error('Error deleting user:', error);
+        console.error('Error deleting user:', error);
     }
-  };
+};
 
   const deleteDevice = async (deviceId) => {
     try {
@@ -172,7 +280,15 @@ const Homepage = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await axios.get(GET_USERS);
+        const token = localStorage.getItem('token'); 
+  
+        const config = {
+          headers: {
+            'Authorization': `Bearer ${token}` 
+          }
+        };
+  
+        const response = await axios.get(GET_USERS, config); 
         setUsers(response.data);
       } catch (error) {
         setIsError(true);
@@ -181,12 +297,20 @@ const Homepage = () => {
 
     const fetchDevices = async () => {
       try {
-        const response = await axios.get(GET_DEVICES);
-        setDevices(response.data);
+          const token = localStorage.getItem('token'); 
+
+          const config = {
+              headers: {
+                  'Authorization': `Bearer ${token}` 
+              }
+          };
+
+          const response = await axios.get(GET_DEVICES, config); 
+          setDevices(response.data);
       } catch (error) {
-        setIsError(true);
+          setIsError(true);
       }
-    };
+  };
 
     fetchUsers();
     fetchDevices();
@@ -364,6 +488,32 @@ useEffect(() => {
         </div>
         
       )}
+
+<div className="chat-container">
+<div className="messages">
+    {messages.map((msg, index) => (
+      <div key={index} className={`message ${msg.sender === 'self' ? 'sent' : 'received'}`}>
+        <strong>{msg.sender === 'self' ? 'Sent: ' : 'Received: '}</strong> {msg.text}
+      </div>
+    ))}
+  </div>
+
+  {isTyping && <div className="typing-indicator">User is typing...</div>}
+        <input 
+          type="text" 
+          value={messageText} 
+          onChange={(e) => {
+            setMessageText(e.target.value);
+            handleTyping();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              sendMessage();
+            }
+          }} 
+        />
+        <button onClick={sendMessage}>Send</button>
+      </div>
     </div>
   );
 };

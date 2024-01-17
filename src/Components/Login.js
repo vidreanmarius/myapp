@@ -3,6 +3,7 @@ import loginApi from '../Api/LoginApi';
 import '../Styles/Login.css';
 import { HOME_ROUTE } from '../Utils/UrlConstants';
 import { useNavigate } from "react-router-dom";
+import { jwtDecode } from 'jwt-decode';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -22,11 +23,18 @@ const Login = () => {
   const handleLogin = async () => {
     try {
       const response = await loginApi(username, password);
-      if (response && response.role) {
-        setUserRole(response.role);
+      if (response && response.token) {
+        const decoded = jwtDecode(response.token);
+        console.log(decoded);
+        
+        const userRole = decoded.role || ''; 
+        const userId = decoded.userId || '';
+  
+        setUserRole(userRole);
         setLoggedIn(true);
-        localStorage.setItem('userRole', response.role); 
-        localStorage.setItem('userId', response.id);
+        localStorage.setItem('userRole', userRole);
+        localStorage.setItem('userId', userId);
+        localStorage.setItem('token', response.token);
         navigate(HOME_ROUTE);
       }
     } catch (error) {
